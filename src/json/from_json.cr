@@ -8,9 +8,8 @@
 # Int32.from_json("1")                # => 1
 # Array(Int32).from_json("[1, 2, 3]") # => [1, 2, 3]
 # ```
-def Object.from_json(string_or_io) : self
-  parser = JSON::PullParser.new(string_or_io)
-  new parser
+def Object.from_json(string_or_io : String | IO) : self
+  from_json(JSON::PullParser.new(string_or_io))
 end
 
 # Deserializes the given JSON in *string_or_io* into
@@ -21,11 +20,17 @@ end
 # ```
 # Int32.from_json(%({"main": 1}), root: "main") # => 1
 # ```
-def Object.from_json(string_or_io, root : String) : self
+def Object.from_json(string_or_io : String | IO, root : String) : self
   parser = JSON::PullParser.new(string_or_io)
   parser.on_key!(root) do
-    new parser
+    from_json(parser)
   end
+end
+
+def Object.from_json(pull : JSON::PullParser)
+  instance = allocate
+  instance.initialize_from_json(pull)
+  instance
 end
 
 # Parses a `String` or `IO` denoting a JSON array, yielding
@@ -50,29 +55,29 @@ end
 # ```
 #
 # To parse and get an `Array`, use the block-less overload.
-def Array.from_json(string_or_io) : Nil
+def Array.from_json(string_or_io : String | IO) : Nil
   parser = JSON::PullParser.new(string_or_io)
-  new(parser) do |element|
+  from_json(parser) do |element|
     yield element
   end
   nil
 end
 
-def Nil.new(pull : JSON::PullParser)
+def Nil.from_json(pull : JSON::PullParser)
   pull.read_null
 end
 
-def Bool.new(pull : JSON::PullParser)
+def Bool.from_json(pull : JSON::PullParser)
   pull.read_bool
 end
 
 {% for type in %w(Int8 Int16 Int32 Int64 UInt8 UInt16 UInt32 UInt64) %}
-  def {{type.id}}.new(pull : JSON::PullParser)
+  def {{type.id}}.from_json(pull : JSON::PullParser)
     {{type.id}}.new(pull.read_int)
   end
 {% end %}
 
-def Float32.new(pull : JSON::PullParser)
+def Float32.from_json(pull : JSON::PullParser)
   case pull.kind
   when :int
     value = pull.int_value.to_f32
@@ -83,7 +88,7 @@ def Float32.new(pull : JSON::PullParser)
   end
 end
 
-def Float64.new(pull : JSON::PullParser)
+def Float64.from_json(pull : JSON::PullParser)
   case pull.kind
   when :int
     value = pull.int_value.to_f
@@ -94,50 +99,50 @@ def Float64.new(pull : JSON::PullParser)
   end
 end
 
-def String.new(pull : JSON::PullParser)
+def String.from_json(pull : JSON::PullParser)
   pull.read_string
 end
 
-def Array.new(pull : JSON::PullParser)
+def Array.from_json(pull : JSON::PullParser)
   ary = new
-  new(pull) do |element|
+  from_json(pull) do |element|
     ary << element
   end
   ary
 end
 
-def Array.new(pull : JSON::PullParser)
+def Array.from_json(pull : JSON::PullParser)
   pull.read_array do
-    yield T.new(pull)
+    yield T.from_json(pull)
   end
 end
 
-def Set.new(pull : JSON::PullParser)
+def Set.from_json(pull : JSON::PullParser)
   set = new
   pull.read_array do
-    set << T.new(pull)
+    set << T.from_json(pull)
   end
   set
 end
 
-def Hash.new(pull : JSON::PullParser)
+def Hash.from_json(pull : JSON::PullParser)
   hash = new
   pull.read_object do |key|
     if pull.kind == :null
       pull.read_next
     else
-      hash[key] = V.new(pull)
+      hash[key] = V.from_json(pull)
     end
   end
   hash
 end
 
-def Tuple.new(pull : JSON::PullParser)
+def Tuple.from_json(pull : JSON::PullParser)
   {% begin %}
     pull.read_begin_array
     value = Tuple.new(
       {% for i in 0...T.size %}
-        (self[{{i}}].new(pull)),
+        (self[{{i}}].from_json(pull)),
       {% end %}
     )
     pull.read_end_array
@@ -145,7 +150,7 @@ def Tuple.new(pull : JSON::PullParser)
  {% end %}
 end
 
-def NamedTuple.new(pull : JSON::PullParser)
+def NamedTuple.from_json(pull : JSON::PullParser)
   {% begin %}
     {% for key in T.keys %}
       %var{key.id} = nil
@@ -157,7 +162,7 @@ def NamedTuple.new(pull : JSON::PullParser)
       case key
         {% for key, type in T %}
           when {{key.stringify}}
-            %var{key.id} = {{type}}.new(pull)
+            %var{key.id} = {{type}}.from_json(pull)
         {% end %}
       else
         pull.skip
@@ -178,7 +183,7 @@ def NamedTuple.new(pull : JSON::PullParser)
   {% end %}
 end
 
-def Enum.new(pull : JSON::PullParser)
+def Enum.from_json(pull : JSON::PullParser)
   case pull.kind
   when :int
     from_value(pull.read_int)
@@ -189,7 +194,7 @@ def Enum.new(pull : JSON::PullParser)
   end
 end
 
-def Union.new(pull : JSON::PullParser)
+def Union.from_json(pull : JSON::PullParser)
   location = pull.location
 
   # Optimization: use fast path for primitive types
@@ -215,7 +220,7 @@ def Union.new(pull : JSON::PullParser)
     # If after traversing all the types we are left with just one
     # non-primitive type, we can parse it directly (no need to use `read_raw`)
     {% if non_primitives.size == 1 %}
-      return {{non_primitives[0]}}.new(pull)
+      return {{non_primitives[0]}}.from_json(pull)
     {% end %}
   {% end %}
 
@@ -238,7 +243,7 @@ end
 # time value.
 #
 # See `#to_json` for reference.
-def Time.new(pull : JSON::PullParser)
+def Time.from_json(pull : JSON::PullParser)
   Time::Format::ISO_8601_DATE_TIME.parse(pull.read_string)
 end
 

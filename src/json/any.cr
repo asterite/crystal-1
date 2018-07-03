@@ -18,7 +18,7 @@ struct JSON::Any
   alias Type = Nil | Bool | Int64 | Float64 | String | Array(Any) | Hash(String, Any)
 
   # Reads a `JSON::Any` value from the given pull parser.
-  def self.new(pull : JSON::PullParser)
+  def self.from_json(pull : JSON::PullParser)
     case pull.kind
     when :null
       new pull.read_null
@@ -33,13 +33,13 @@ struct JSON::Any
     when :begin_array
       ary = [] of JSON::Any
       pull.read_array do
-        ary << new(pull)
+        ary << from_json(pull)
       end
       new ary
     when :begin_object
       hash = {} of String => JSON::Any
       pull.read_object do |key|
-        hash[key] = new(pull)
+        hash[key] = from_json(pull)
       end
       new hash
     else

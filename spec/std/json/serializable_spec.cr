@@ -41,6 +41,9 @@ class StrictJSONAttrPerson
 
   property name : String
   property age : Int32?
+
+  def initialize(@name)
+  end
 end
 
 class JSONAttrPersonExtraFields
@@ -49,6 +52,9 @@ class JSONAttrPersonExtraFields
 
   property name : String
   property age : Int32?
+
+  def initialize(@name)
+  end
 end
 
 class JSONAttrPersonEmittingNull
@@ -58,6 +64,9 @@ class JSONAttrPersonEmittingNull
 
   @[JSON::Field(emit_null: true)]
   property age : Int32?
+
+  def initialize(@name)
+  end
 end
 
 @[JSON::Serializable::Options(emit_nulls: true)]
@@ -70,24 +79,36 @@ class JSONAttrPersonEmittingNullsByOptions
 
   @[JSON::Field(emit_null: false)]
   property value2 : Int32?
+
+  def initialize(@name)
+  end
 end
 
 class JSONAttrWithBool
   include JSON::Serializable
 
   property value : Bool
+
+  def initialize(@value)
+  end
 end
 
 class JSONAttrWithUUID
   include JSON::Serializable
 
   property value : UUID
+
+  def initialize(@value)
+  end
 end
 
 class JSONAttrWithBigDecimal
   include JSON::Serializable
 
   property value : BigDecimal
+
+  def initialize(@value)
+  end
 end
 
 class JSONAttrWithTime
@@ -95,6 +116,9 @@ class JSONAttrWithTime
 
   @[JSON::Field(converter: Time::Format.new("%F %T"))]
   property value : Time
+
+  def initialize(@value)
+  end
 end
 
 class JSONAttrWithNilableTime
@@ -121,6 +145,9 @@ class JSONAttrWithPropertiesKey
   include JSON::Serializable
 
   property properties : Hash(String, String)
+
+  def initialize(@properties)
+  end
 end
 
 class JSONAttrWithSimpleMapping
@@ -128,6 +155,9 @@ class JSONAttrWithSimpleMapping
 
   property name : String
   property age : Int32
+
+  def initialize(@name, @age)
+  end
 end
 
 class JSONAttrWithKeywordsMapping
@@ -135,6 +165,9 @@ class JSONAttrWithKeywordsMapping
 
   property end : Int32
   property abstract : Int32
+
+  def initialize(@end, @abstract)
+  end
 end
 
 class JSONAttrWithAny
@@ -142,6 +175,9 @@ class JSONAttrWithAny
 
   property name : String
   property any : JSON::Any
+
+  def initialize(@name, @any)
+  end
 end
 
 class JSONAttrWithProblematicKeys
@@ -149,12 +185,18 @@ class JSONAttrWithProblematicKeys
 
   property key : Int32
   property pull : Int32
+
+  def initialize(@key, @pull)
+  end
 end
 
 class JSONAttrWithSet
   include JSON::Serializable
 
   property set : Set(String)
+
+  def initialize(@set)
+  end
 end
 
 class JSONAttrWithDefaults
@@ -175,6 +217,9 @@ class JSONAttrWithSmallIntegers
 
   property foo : Int16
   property bar : Int8
+
+  def initialize(@foo, @bar)
+  end
 end
 
 class JSONAttrWithTimeEpoch
@@ -182,6 +227,9 @@ class JSONAttrWithTimeEpoch
 
   @[JSON::Field(converter: Time::EpochConverter)]
   property value : Time
+
+  def initialize(@value)
+  end
 end
 
 class JSONAttrWithTimeEpochMillis
@@ -189,6 +237,9 @@ class JSONAttrWithTimeEpochMillis
 
   @[JSON::Field(converter: Time::EpochMillisConverter)]
   property value : Time
+
+  def initialize(@value)
+  end
 end
 
 class JSONAttrWithRaw
@@ -196,6 +247,9 @@ class JSONAttrWithRaw
 
   @[JSON::Field(converter: String::RawConverter)]
   property value : String
+
+  def initialize(@value)
+  end
 end
 
 class JSONAttrWithRoot
@@ -203,6 +257,9 @@ class JSONAttrWithRoot
 
   @[JSON::Field(root: "heroes")]
   property result : Array(JSONAttrPerson)
+
+  def initialize(@result)
+  end
 end
 
 class JSONAttrWithNilableRoot
@@ -241,10 +298,10 @@ class JSONAttrWithPresence
   property last_name : String?
 
   @[JSON::Field(ignore: true)]
-  getter? first_name_present : Bool
+  getter? first_name_present = false
 
   @[JSON::Field(ignore: true)]
-  getter? last_name_present : Bool
+  getter? last_name_present = false
 end
 
 class JSONAttrWithQueryAttributes
@@ -256,7 +313,10 @@ class JSONAttrWithQueryAttributes
   property? bar : Bool = false
 
   @[JSON::Field(ignore: true)]
-  getter? bar_present : Bool
+  getter? bar_present = false
+
+  def initialize(@foo)
+  end
 end
 
 module JSONAttrModule

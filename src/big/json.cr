@@ -1,17 +1,17 @@
 require "json"
 require "big"
 
-def BigInt.new(pull : JSON::PullParser)
+def BigInt.from_json(pull : JSON::PullParser)
   pull.read_int
   BigInt.new(pull.raw_value)
 end
 
-def BigFloat.new(pull : JSON::PullParser)
+def BigFloat.from_json(pull : JSON::PullParser)
   pull.read_float
   BigFloat.new(pull.raw_value)
 end
 
-def BigDecimal.new(pull : JSON::PullParser)
+def BigDecimal.from_json(pull : JSON::PullParser)
   case pull.kind
   when :int
     pull.read_int

@@ -111,28 +111,7 @@ module JSON
     annotation Options
     end
 
-    macro included
-      # Define a `new` directly in the included type,
-      # so it overloads well with other possible initializes
-
-      def self.new(pull : ::JSON::PullParser)
-        instance = allocate
-        instance.initialize(pull, nil)
-        GC.add_finalizer(instance) if instance.responds_to?(:finalize)
-        instance
-      end
-
-      # When the type is inherited, carry over the `new`
-      # so it can compete with other possible intializes
-
-      macro inherited
-        def self.new(pull : ::JSON::PullParser)
-          super
-        end
-      end
-    end
-
-    def initialize(pull : ::JSON::PullParser, dummy : Nil)
+    def initialize_from_json(pull : ::JSON::PullParser)
       {% begin %}
         {% properties = {} of Nil => Nil %}
         {% for ivar in @type.instance_vars %}
@@ -183,7 +162,7 @@ module JSON
                     {% if value[:converter] %}
                       {{value[:converter]}}.from_json(pull)
                     {% else %}
-                      ::Union({{value[:type]}}).new(pull)
+                      ::Union({{value[:type]}}).from_json(pull)
                     {% end %}
 
                     {% if value[:root] %}
@@ -322,7 +301,7 @@ module JSON
 
       protected def on_unknown_json_attribute(pull, key, key_location)
         json_unmapped[key] = begin
-          JSON::Any.new(pull)
+          JSON::Any.from_json(pull)
         rescue exc : ::JSON::ParseException
           raise ::JSON::MappingError.new(exc.message, self.class.to_s, key, *key_location, exc)
         end
