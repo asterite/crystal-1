@@ -5,12 +5,6 @@
 class Process
   PATH_DELIMITER = {% if flag?(:windows) %} ';' {% else %} ':' {% end %}
 
-  # :nodoc:
-  INITIAL_PATH = ENV["PATH"]?
-
-  # :nodoc:
-  INITIAL_PWD = Dir.current
-
   # Returns an absolute path to the executable file of the currently running
   # program. This is in opposition to `PROGRAM_NAME` which may be a relative or
   # absolute path, just the executable file name or a symlink.
@@ -95,6 +89,12 @@ end
 
 {% else %} # openbsd, ...
   class Process
+    # :nodoc:
+    INITIAL_PATH = ENV["PATH"]?
+
+    # :nodoc:
+    INITIAL_PWD = Dir.current
+
     private def self.executable_path_impl
       find_executable(PROGRAM_NAME, INITIAL_PATH, INITIAL_PWD)
     end
