@@ -304,6 +304,10 @@ class Crystal::CodeGenVisitor
     llvm_nil
   end
 
+  def downcast_distinct(value, to_type : NoReturnType, from_type : Type)
+    value
+  end
+
   def downcast_distinct(value, to_type, from_type : MetaclassType | GenericClassInstanceMetaclassType | GenericModuleInstanceMetaclassType | VirtualMetaclassType)
     value
   end

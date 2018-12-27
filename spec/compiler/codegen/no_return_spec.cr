@@ -89,4 +89,15 @@ describe "Code gen: no return" do
       typeof(raise("").foo)
       ))
   end
+
+  it "casts value to NoReturn (#7222)" do
+    codegen(%(
+      def foo(arg)
+        return if true || arg.nil?
+        arg
+      end
+
+      foo(nil)
+      ))
+  end
 end
