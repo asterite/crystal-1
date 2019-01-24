@@ -504,12 +504,17 @@ class Crystal::CodeGenVisitor
     return @main_module_info if @single_module
 
     @types_to_modules[type] ||= begin
-      type = type.remove_typedef
+      type = type.remove_typedef.instance_type.devirtualize
+
       case type
       when Nil, Program, LibType
         type_name = ""
+      when GenericType
+        type_name = type.full_name
+      when GenericInstanceType
+        type_name = type.generic_type.full_name
       else
-        type_name = type.instance_type.to_s
+        type_name = type.to_s
       end
 
       @modules[type_name] ||= begin
