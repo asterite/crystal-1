@@ -48,7 +48,8 @@ class Crystal::CodeGenVisitor
     global_name = const.llvm_name
     global = @main_mod.globals[global_name]? ||
              @main_mod.globals.add(@main_llvm_typer.llvm_type(const.value.type), global_name)
-    global.linkage = LLVM::Linkage::Internal if @single_module
+    # TODO: enable once using i128 internal globals is supported by LLVM
+    # global.linkage = LLVM::Linkage::Internal if @single_module
     global
   end
 
