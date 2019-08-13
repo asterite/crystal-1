@@ -203,24 +203,9 @@ class Regex
 
   @[Flags]
   enum Options
-    IGNORE_CASE = 1
-    # PCRE native `PCRE_MULTILINE` flag is `2`, and `PCRE_DOTALL` is `4`
-    # - `PCRE_DOTALL` changes the "`.`" meaning
-    # - `PCRE_MULTILINE` changes "`^`" and "`$`" meanings
-    #
-    # Crystal modifies this meaning to have essentially one unique "`m`"
-    # flag that activates both behaviours, so here we do the same by
-    # mapping `MULTILINE` to `PCRE_MULTILINE | PCRE_DOTALL`.
-    MULTILINE = 6
-    EXTENDED  = 8
-    # :nodoc:
-    ANCHORED = 16
-    # :nodoc:
-    UTF_8 = 0x00000800
-    # :nodoc:
-    NO_UTF8_CHECK = 0x00002000
-    # :nodoc:
-    DUPNAMES = 0x00080000
+    IGNORE_CASE = LibOniguruma::ONIG_OPTION_IGNORECASE
+    MULTILINE   = LibOniguruma::ONIG_OPTION_MULTILINE
+    EXTENDED    = LibOniguruma::ONIG_OPTION_EXTEND
   end
 
   # Returns a `Regex::Options` representing the optional flags applied to this `Regex`.
@@ -247,15 +232,22 @@ class Regex
   # Regex.new("dog", options) # => /dog/ix
   # ```
   def initialize(source : String, @options : Options = Options::None)
-    # PCRE's pattern must have their null characters escaped
-    source = source.gsub('\u{0}', "\\0")
+    # TODO: check this
+    # source = source.gsub('\u{0}', "\\0")
     @source = source
 
-    @re = LibPCRE.compile(@source, (options | Options::UTF_8 | Options::NO_UTF8_CHECK | Options::DUPNAMES), out errptr, out erroffset, nil)
-    raise ArgumentError.new("#{String.new(errptr)} at #{erroffset}") if @re.null?
-    @extra = LibPCRE.study(@re, 0, out studyerrptr)
-    raise ArgumentError.new("#{String.new(studyerrptr)}") if @extra.null? && studyerrptr
-    LibPCRE.full_info(@re, nil, LibPCRE::INFO_CAPTURECOUNT, out @captures)
+    r = LibOniguruma.onig_new(out @re,
+      source.to_unsafe,
+      source.to_unsafe + source.bytesize,
+      LibOniguruma::ONIG_OPTION_CAPTURE_GROUP,
+      pointerof(LibOniguruma.onig_encoding_utf8),
+      pointerof(LibOniguruma.onig_syntax_oniguruma),
+      out einfo)
+    if r != 0
+      raise ArgumentError.new("TODO: get error from oniguruma")
+    end
+
+    @number_of_captures = LibOniguruma.onig_number_of_captures(@re)
   end
 
   # Determines Regex's source validity. If it is, `nil` is returned.
@@ -477,11 +469,15 @@ class Regex
   def match_at_byte_index(str, byte_index = 0, options = Regex::Options::None) : MatchData?
     return ($~ = nil) if byte_index > str.bytesize
 
-    ovector_size = (@captures + 1) * 3
-    ovector = Pointer(Int32).malloc(ovector_size)
-    ret = LibPCRE.exec(@re, @extra, str, str.bytesize, byte_index, (options | Options::NO_UTF8_CHECK), ovector, ovector_size)
-    if ret > 0
-      match = MatchData.new(self, @re, str, byte_index, ovector, @captures)
+    region = LibOniguruma::OnigRegion.new
+
+    end_pos = str.to_unsafe + str.bytesize
+    start = str.to_unsafe
+    range = end_pos
+
+    r = LibOniguruma.onig_search(@re, str, end_pos, start, range, pointerof(region), 0)
+    if r >= 0
+      match = MatchData.new(self, region, str, byte_index, @number_of_captures)
     else
       match = nil
     end

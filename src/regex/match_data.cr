@@ -15,7 +15,7 @@ class Regex
   # argument to select the desired capture group. Capture groups are numbered
   # starting from `1`, so that `0` can be used to refer to the entire regular
   # expression without needing to capture it explicitly.
-  struct MatchData
+  class MatchData
     # Returns the original regular expression.
     #
     # ```
@@ -40,7 +40,7 @@ class Regex
     getter string : String
 
     # :nodoc:
-    def initialize(@regex : Regex, @code : LibPCRE::Pcre, @string : String, @pos : Int32, @ovector : Int32*, @group_size : Int32)
+    def initialize(@regex : Regex, @region : LibOniguruma::OnigRegion, @string : String, @pos : Int32, @group_size : Int32)
     end
 
     # Returns the number of elements in this match object.
@@ -95,7 +95,7 @@ class Regex
     def byte_begin(n = 0)
       check_index_out_of_bounds n
       n += size if n < 0
-      @ovector[n * 2]
+      @region.beg[n]
     end
 
     # Returns the position of the next byte after the match.
@@ -124,12 +124,13 @@ class Regex
     # "Crystal".match(/r(ys)/).not_nil![1]? # => "ys"
     # "Crystal".match(/r(ys)/).not_nil![2]? # => nil
     # ```
-    def []?(n)
+    def []?(n : Int)
       return unless valid_group?(n)
 
       n += size if n < 0
-      start = @ovector[n * 2]
-      finish = @ovector[n * 2 + 1]
+
+      start = @region.beg[n]
+      finish = @region.end_[n]
       return if start < 0
       @string.byte_slice(start, finish - start)
     end
@@ -141,7 +142,7 @@ class Regex
     # "Crystal".match(/r(ys)/).not_nil![1] # => "ys"
     # "Crystal".match(/r(ys)/).not_nil![2] # raises IndexError
     # ```
-    def [](n)
+    def [](n : Int)
       check_index_out_of_bounds n
       n += size if n < 0
 
@@ -165,16 +166,10 @@ class Regex
     # "Crystal".match(/(?<ok>Cr).*(?<ok>al)/).not_nil!["ok"]? # => "al"
     # ```
     def []?(group_name : String)
-      max_start = -1
-      match = nil
-      named_capture_number(group_name) do |n|
-        start = @ovector[n * 2]
-        if start > max_start
-          max_start = start
-          match = self[n]?
-        end
-      end
-      match
+      nums = Pointer(Int32).malloc(group_size)
+      r = LibOniguruma.onig_name_to_group_numbers(regex.@re, group_name, group_name.to_unsafe + group_name.bytesize, pointerof(nums))
+      value = self[nums[r - 1]]? if r > 0
+      value
     end
 
     # Returns the match of the capture group named by *group_name*, or
@@ -192,28 +187,17 @@ class Regex
     # "Crystal".match(/(?<ok>Cr).*(?<ok>al)/).not_nil!["ok"] # => "al"
     # ```
     def [](group_name : String)
-      match = self[group_name]?
-      unless match
-        named_capture_number(group_name) do
-          raise KeyError.new("Capture group '#{group_name}' was not matched")
-        end
+      nums = Pointer(Int32).malloc(group_size)
+      r = LibOniguruma.onig_name_to_group_numbers(regex.@re, group_name, group_name.to_unsafe + group_name.bytesize, pointerof(nums))
+      if r < 0
         raise KeyError.new("Capture group '#{group_name}' does not exist")
       end
-      match
-    end
 
-    private def named_capture_number(group_name)
-      name_entry_size = LibPCRE.get_stringtable_entries(@code, group_name, out first, out last)
-      return if name_entry_size < 0
-
-      while first <= last
-        capture_number = (first[0].to_u16 << 8) | first[1].to_u16
-        yield capture_number
-
-        first += name_entry_size
+      value = self[nums[r - 1]]?
+      unless value
+        raise KeyError.new("Capture group '#{group_name}' was not matched")
       end
-
-      nil
+      value
     end
 
     # Returns the part of the original string before the match. If the match
@@ -367,6 +351,10 @@ class Regex
 
     def clone
       self
+    end
+
+    def finalize
+      LibOniguruma.onig_region_free(pointerof(@region), 0)
     end
 
     def ==(other : Regex::MatchData)
