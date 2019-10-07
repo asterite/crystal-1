@@ -425,32 +425,33 @@ struct XML::Node
   end
 
   # :nodoc:
-  SAVE_MUTEX = Thread::Mutex.new
+  SAVE_MUTEX = Mutex.new
 
   # Serialize this Node as XML to *io* using default options.
   #
   # See `XML::SaveOptions.xml_default` for default options.
   def to_xml(io : IO, indent = 2, indent_text = " ", options : SaveOptions = SaveOptions.xml_default)
+    oldXmlIndentTreeOutput = LibXML.xmlIndentTreeOutput
+    oldXmlTreeIndentString = LibXML.xmlTreeIndentString
+
+    save_ctx = LibXML.xmlSaveToIO(
+      ->(ctx, buffer, len) {
+        Box(IO).unbox(ctx).write Slice.new(buffer, len)
+        len
+      },
+      ->(ctx) {
+        Box(IO).unbox(ctx).flush
+        0
+      },
+      Box(IO).box(io),
+      @node.value.doc.value.encoding,
+      options)
+
     # We need to use a mutex because we modify global libxml variables
     SAVE_MUTEX.synchronize do
-      oldXmlIndentTreeOutput = LibXML.xmlIndentTreeOutput
       LibXML.xmlIndentTreeOutput = 1
-
-      oldXmlTreeIndentString = LibXML.xmlTreeIndentString
       LibXML.xmlTreeIndentString = (indent_text * indent).to_unsafe
 
-      save_ctx = LibXML.xmlSaveToIO(
-        ->(ctx, buffer, len) {
-          Box(IO).unbox(ctx).write Slice.new(buffer, len)
-          len
-        },
-        ->(ctx) {
-          Box(IO).unbox(ctx).flush
-          0
-        },
-        Box(IO).box(io),
-        @node.value.doc.value.encoding,
-        options)
       LibXML.xmlSaveTree(save_ctx, self)
       LibXML.xmlSaveClose(save_ctx)
 
